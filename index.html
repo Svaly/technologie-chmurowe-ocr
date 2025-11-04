@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR Image Processor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 0.95em;
+        }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: #f8f9ff;
+        }
+
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: #f0f2ff;
+        }
+
+        .upload-area.drag-over {
+            background: #e8ebff;
+            border-color: #764ba2;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        .upload-text {
+            color: #666;
+            font-size: 1.1em;
+            margin-bottom: 10px;
+        }
+
+        .file-info {
+            color: #667eea;
+            font-weight: 600;
+            margin-top: 15px;
+            display: none;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .image-preview {
+            max-width: 100%;
+            max-height: 300px;
+            margin: 20px auto;
+            display: none;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            flex: 1;
+            padding: 15px 30px;
+            font-size: 1.1em;
+            font-weight: 600;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #666;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #d0d0d0;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status {
+            text-align: center;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+            font-weight: 500;
+        }
+
+        .status.loading {
+            background: #fff3cd;
+            color: #856404;
+            display: block;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            display: block;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .result-box {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            display: none;
+            border-left: 4px solid #667eea;
+        }
+
+        .result-box h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .result-text {
+            color: #444;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 1em;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            min-height: 100px;
+        }
+
+        .config-section {
+            background: #f8f9ff;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .config-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1em;
+        }
+
+        .input-group {
+            margin-bottom: 12px;
+        }
+
+        .input-group label {
+            display: block;
+            color: #666;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.9em;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .toggle-config {
+            background: none;
+            border: 1px solid #667eea;
+            color: #667eea;
+            padding: 8px 16px;
+            font-size: 0.9em;
+            margin-bottom: 15px;
+        }
+
+        .config-form {
+            display: none;
+        }
+
+        .config-form.show {
+            display: block;
+        }
+
+        .deployment-info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 20px;
+            color: #0c5460;
+            font-size: 0.9em;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 OCR Image Processor</h1>
+        <p class="subtitle">Upload an image and extract text using Azure OCR</p>
+
+        <div class="deployment-info" id="deploymentInfo" style="display: none;">
+            ✅ Configured and ready to use!
+        </div>
+
+        <div class="config-section">
+            <button class="toggle-config" onclick="toggleConfig()">⚙️ Configuration</button>
+            <div class="config-form" id="configForm">
+                <div class="input-group">
+                    <label for="storageUrl">Storage Function URL:</label>
+                    <input type="text" id="storageUrl" placeholder="https://your-function.azurewebsites.net/api/uploadimage?code=...">
+                </div>
+                <div class="input-group">
+                    <label for="ocrUrl">OCR Function URL:</label>
+                    <input type="text" id="ocrUrl" placeholder="https://your-function.azurewebsites.net/api/ocr?code=...">
+                </div>
+            </div>
+        </div>
+
+        <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+            <div class="upload-icon">📸</div>
+            <div class="upload-text">Click to select an image or drag and drop</div>
+            <div class="file-info" id="fileInfo"></div>
+        </div>
+
+        <input type="file" id="fileInput" accept="image/*">
+        
+        <img id="imagePreview" class="image-preview" alt="Preview">
+
+        <div class="button-group">
+            <button class="btn-secondary" id="clearBtn" onclick="clearSelection()" disabled>Clear</button>
+            <button class="btn-primary" id="processBtn" onclick="processImage()" disabled>Process OCR</button>
+        </div>
+
+        <div class="status" id="status"></div>
+
+        <div class="result-box" id="resultBox">
+            <h3>📄 Extracted Text:</h3>
+            <div class="result-text" id="resultText"></div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script>
+        let selectedFile = null;
+
+        // Load configuration from config.js or localStorage
+        window.onload = function() {
+            // Try to load from config.js first (deployed configuration)
+            if (typeof window.CONFIG !== 'undefined') {
+                document.getElementById('storageUrl').value = window.CONFIG.storageUrl || '';
+                document.getElementById('ocrUrl').value = window.CONFIG.ocrUrl || '';
+                // Save to localStorage for future reference
+                if (window.CONFIG.storageUrl) localStorage.setItem('storageUrl', window.CONFIG.storageUrl);
+                if (window.CONFIG.ocrUrl) localStorage.setItem('ocrUrl', window.CONFIG.ocrUrl);
+                
+                // Show deployment info if configured
+                if (window.CONFIG.storageUrl && window.CONFIG.ocrUrl) {
+                    document.getElementById('deploymentInfo').style.display = 'block';
+                }
+            } else {
+                // Fallback to localStorage if config.js is not available
+                const storageUrl = localStorage.getItem('storageUrl');
+                const ocrUrl = localStorage.getItem('ocrUrl');
+                if (storageUrl) document.getElementById('storageUrl').value = storageUrl;
+                if (ocrUrl) document.getElementById('ocrUrl').value = ocrUrl;
+            }
+        }
+
+        // Save configuration on input change
+        document.getElementById('storageUrl').addEventListener('input', function(e) {
+            localStorage.setItem('storageUrl', e.target.value);
+        });
+
+        document.getElementById('ocrUrl').addEventListener('input', function(e) {
+            localStorage.setItem('ocrUrl', e.target.value);
+        });
+
+        function toggleConfig() {
+            const configForm = document.getElementById('configForm');
+            configForm.classList.toggle('show');
+        }
+
+        // File input change event
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            handleFile(e.target.files[0]);
+        });
+
+        // Drag and drop events
+        const uploadArea = document.getElementById('uploadArea');
+
+        uploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            uploadArea.classList.add('drag-over');
+        });
+
+        uploadArea.addEventListener('dragleave', function() {
+            uploadArea.classList.remove('drag-over');
+        });
+
+        uploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                handleFile(file);
+            } else {
+                showStatus('Please drop an image file', 'error');
+            }
+        });
+
+        function handleFile(file) {
+            if (!file) return;
+
+            selectedFile = file;
+            
+            // Show file info
+            const fileInfo = document.getElementById('fileInfo');
+            fileInfo.textContent = `Selected: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`;
+            fileInfo.style.display = 'block';
+
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const preview = document.getElementById('imagePreview');
+                preview.src = e.target.result;
+                preview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+
+            // Enable buttons
+            document.getElementById('processBtn').disabled = false;
+            document.getElementById('clearBtn').disabled = false;
+
+            // Hide result box
+            document.getElementById('resultBox').style.display = 'none';
+            hideStatus();
+        }
+
+        function clearSelection() {
+            selectedFile = null;
+            document.getElementById('fileInput').value = '';
+            document.getElementById('fileInfo').style.display = 'none';
+            document.getElementById('imagePreview').style.display = 'none';
+            document.getElementById('processBtn').disabled = true;
+            document.getElementById('clearBtn').disabled = true;
+            document.getElementById('resultBox').style.display = 'none';
+            hideStatus();
+        }
+
+        async function processImage() {
+            if (!selectedFile) {
+                showStatus('Please select an image first', 'error');
+                return;
+            }
+
+            const storageUrl = document.getElementById('storageUrl').value;
+            const ocrUrl = document.getElementById('ocrUrl').value;
+
+            if (!storageUrl || !ocrUrl) {
+                showStatus('Please configure Storage and OCR function URLs', 'error');
+                return;
+            }
+
+            try {
+                // Disable buttons during processing
+                document.getElementById('processBtn').disabled = true;
+                document.getElementById('clearBtn').disabled = true;
+
+                // Step 1: Upload image to storage
+                showStatus('Uploading image to storage...', 'loading');
+                
+                const formData = new FormData();
+                formData.append('file', selectedFile);
+
+                const uploadResponse = await fetch(storageUrl, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!uploadResponse.ok) {
+                    throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+                }
+
+                const imageUrl = await uploadResponse.text();
+                console.log('Image URL:', imageUrl);
+
+                // Step 2: Process OCR
+                showStatus('Processing OCR...', 'loading');
+
+                const ocrResponse = await fetch(ocrUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ image_url: imageUrl })
+                });
+
+                if (!ocrResponse.ok) {
+                    throw new Error(`OCR failed: ${ocrResponse.statusText}`);
+                }
+
+                const ocrResult = await ocrResponse.json();
+                console.log('OCR Result:', ocrResult);
+
+                // Display result
+                showStatus('OCR processing completed successfully!', 'success');
+                displayResult(ocrResult.text || 'No text detected in the image.');
+
+            } catch (error) {
+                console.error('Error:', error);
+                showStatus(`Error: ${error.message}`, 'error');
+            } finally {
+                // Re-enable buttons
+                document.getElementById('processBtn').disabled = false;
+                document.getElementById('clearBtn').disabled = false;
+            }
+        }
+
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.className = `status ${type}`;
+            
+            if (type === 'loading') {
+                status.innerHTML = `<span class="spinner"></span>${message}`;
+            } else {
+                status.innerHTML = message;
+            }
+        }
+
+        function hideStatus() {
+            const status = document.getElementById('status');
+            status.className = 'status';
+            status.style.display = 'none';
+        }
+
+        function displayResult(text) {
+            const resultBox = document.getElementById('resultBox');
+            const resultText = document.getElementById('resultText');
+            
+            resultText.textContent = text;
+            resultBox.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
+
