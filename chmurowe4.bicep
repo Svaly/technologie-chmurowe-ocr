@@ -9,9 +9,9 @@ param storageFunctionAppName string = 'ocrstrgfunc${id}'
 param computerVisionName string = 'ocrvision${id}'
 param applicationInsightsName string = 'ocrinsights${id}'
 
-param ocrAzureFunctionCodePackage string = ''
-param ocrStorageAzureFunctionCodePackage string = ''
-param uiHtmlUrl string = '' 
+param ocrAzureFunctionCodePackage string = 'https://github.com/Svaly/technologie-chmurowe-ocr/raw/refs/heads/main/deploy/ocrFunctiondeploymentPackage.zip'
+param ocrStorageAzureFunctionCodePackage string = 'https://github.com/Svaly/technologie-chmurowe-ocr/raw/refs/heads/main/deploy/storageFunctionDeploymentPackage.zip'
+param uiHtmlUrl string = 'https://raw.githubusercontent.com/Svaly/technologie-chmurowe-ocr/refs/heads/main/index.html' 
 
 
 // Resource for Application Insights
@@ -112,7 +112,11 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2022-09-01' = {
 
 
 // remove trailing slash at the end of the url
-var staticWebsiteUrl = substring(storageAccount.properties.primaryEndpoints.web, 0, length(storageAccount.properties.primaryEndpoints.web) - 1)
+var webUrl = storageAccount.properties.primaryEndpoints.web
+var webUrlLength = length(webUrl)
+var staticWebsiteUrl = (webUrlLength > 0 && endsWith(webUrl, '/')) 
+  ? substring(webUrl, 0, max(0, webUrlLength - 1))
+  : webUrl
 
 
 // OCR Azure Function App deployment
@@ -271,9 +275,10 @@ resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2018-
   location: location
 }
 
+// Role assignment for storage account access
 resource roleAssignment 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = {
   scope: storageAccount
-  name: guid(resourceGroup().id, managedIdentity.id, contributorRoleDefinition.id)
+  name: guid(storageAccount.id, managedIdentity.id, contributorRoleDefinition.id)
   properties: {
     roleDefinitionId: contributorRoleDefinition.id
     principalId: managedIdentity.properties.principalId
@@ -281,7 +286,18 @@ resource roleAssignment 'Microsoft.Authorization/roleAssignments@2020-04-01-prev
   }
 }
 
-resource deploymentScript 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
+// Role assignment at resource group level for deployment script to work
+resource roleAssignmentRG 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = {
+  scope: resourceGroup()
+  name: guid(resourceGroup().id, managedIdentity.id, 'Contributor')
+  properties: {
+    roleDefinitionId: contributorRoleDefinition.id
+    principalId: managedIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource deploymentScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
   name: 'deploymentScript'
   location: location
   kind: 'AzurePowerShell'
@@ -293,11 +309,16 @@ resource deploymentScript 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
   }
   dependsOn: [
     roleAssignment
+    roleAssignmentRG
+    functionApp
+    storagefunctionApp
   ]
   properties: {
-    azPowerShellVersion: '3.0'
+    azPowerShellVersion: '10.0'
     scriptContent: loadTextContent('./enable-static-website-new.ps1')
     retentionInterval: 'PT4H'
+    timeout: 'PT5M'
+    cleanupPreference: 'OnSuccess'
     environmentVariables: [
       {
         name: 'ResourceGroupName'

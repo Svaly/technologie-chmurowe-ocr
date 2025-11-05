@@ -12,22 +12,28 @@ Write-Output "Storage Account: $storageAccountName"
 Write-Output "Resource Group: $resourceGroupName"
 Write-Output ""
 
+# Wait for role assignments to propagate
+Write-Output "⏳ Waiting for role assignments to propagate (30 seconds)..."
+Start-Sleep -Seconds 30
+Write-Output "✅ Ready to proceed"
+Write-Output ""
+
+# Get storage account context first
+Write-Output "Step 1: Getting storage account context..."
+$storageAccount = Get-AzStorageAccount -ResourceGroupName $resourceGroupName -Name $storageAccountName
+$ctx = $storageAccount.Context
+Write-Output "✅ Storage context retrieved"
+
 # Enable static website hosting
-Write-Output "Step 1: Enabling static website hosting..."
+Write-Output ""
+Write-Output "Step 2: Enabling static website hosting..."
 try {
-    Enable-AzStorageStaticWebsite -ResourceGroupName $resourceGroupName -StorageAccountName $storageAccountName -IndexDocument index.html -ErrorDocument404Path index.html
+    Enable-AzStorageStaticWebsite -Context $ctx -IndexDocument index.html -ErrorDocument404Path index.html
     Write-Output "✅ Static website hosting enabled"
 } catch {
     Write-Error "Failed to enable static website hosting: $_"
     throw
 }
-
-# Get storage account context
-Write-Output ""
-Write-Output "Step 2: Getting storage account context..."
-$storageAccount = Get-AzStorageAccount -ResourceGroupName $resourceGroupName -Name $storageAccountName
-$ctx = $storageAccount.Context
-Write-Output "✅ Storage context retrieved"
 
 # Create config.js with function URLs
 Write-Output ""
@@ -42,7 +48,9 @@ window.CONFIG = {
 };
 "@
 
-$tempConfigPath = Join-Path $env:TEMP "config-$(Get-Date -Format 'yyyyMMddHHmmss').js"
+# Use /tmp for Linux-based Azure Deployment Scripts or current directory as fallback
+$tempDir = if ($env:TEMP) { $env:TEMP } else { "/tmp" }
+$tempConfigPath = Join-Path $tempDir "config-$(Get-Date -Format 'yyyyMMddHHmmss').js"
 $configContent | Out-File -FilePath $tempConfigPath -Encoding utf8 -NoNewline
 Write-Output "✅ config.js created"
 Write-Output "   Storage URL: $storageFunctionAppUrl"
@@ -51,7 +59,7 @@ Write-Output "   OCR URL: $ocrFunctionAppUrl"
 # Get index.html - either download from URL or use local file
 Write-Output ""
 Write-Output "Step 4: Getting index.html..."
-$tempIndexPath = Join-Path $env:TEMP "index-$(Get-Date -Format 'yyyyMMddHHmmss').html"
+$tempIndexPath = Join-Path $tempDir "index-$(Get-Date -Format 'yyyyMMddHHmmss').html"
 
 if ($uiHtmlUrl -and $uiHtmlUrl -ne '') {
     # Download from URL
